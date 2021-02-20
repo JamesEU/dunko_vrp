@@ -118,6 +118,6 @@ cfg.MiscButtons = {
     end, "player.tptowaypoint", "Teleports you to a waypoint"},
     ["Noclip"] = {function(self)
         tvRP.toggleNoclip({})
-    end, "player.noclip", "Teleports you to a waypoint"},
+    end, "player.noclip", "Noclips you around the map."},
 }
 return cfg
