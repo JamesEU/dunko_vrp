@@ -338,6 +338,8 @@ Citizen.CreateThread(function()
                     DrawMarker(35, x, y, z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 00, 255, 00, 50, false, true, 2, true, nil, nil, false)
                 elseif type == "Heli" then 
                     DrawMarker(34, x, y, z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 00, 255, 00, 50, false, true, 2, true, nil, nil, false)
+                elseif type == "Plane" then 
+                    DrawMarker(33, x, y, z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 00, 255, 00, 50, false, true, 2, true, nil, nil, false)
                 end
             end
         end
@@ -381,7 +383,10 @@ for i,v in pairs(cfg.garages) do
         SetBlipSprite(Blip, 427)
     elseif v[1] == "Heli" then 
         SetBlipSprite(Blip, 43)
+    elseif v[1] == "Plane" then 
+        SetBlipSprite(Blip, 16)
     end
+
     SetBlipDisplay(Blip, 4)
     SetBlipScale(Blip, 0.9)
     SetBlipColour(Blip, 2)
