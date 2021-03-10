@@ -410,7 +410,7 @@ end
 
 AddEventHandler("vRP:playerSpawn",function(user_id, source, first_spawn)
   if first_spawn then -- first spawn, build homes
-    build_client_homes(source)
+   -- build_client_homes(source)
   else -- death, leave home if inside one
     -- leave slot if inside one
     local tmp = vRP.getUserTmpTable(user_id)
