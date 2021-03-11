@@ -22,6 +22,18 @@ Citizen.CreateThread(function()
     end
 end)
 
+local MenuOpen = false;
+Citizen.CreateThread(function()
+    while true do 
+        Wait(0)
+        if inHouseMarker and not MenuOpen then 
+
+        elseif not inHouseMarker and  MenuOpen then 
+
+        end
+    end
+end)
+
 Citizen.CreateThread(function()
     while true do 
         Wait(0)
