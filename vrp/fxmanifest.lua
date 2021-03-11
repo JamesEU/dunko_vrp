@@ -70,6 +70,7 @@ client_scripts{
   "cfg/skinshops.lua",
   "cfg/garages.lua",
   "cfg/admin_menu.lua",
+  "cfg/homes.lua",
   "lib/utils.lua",
   "client/Tunnel.lua",
   "client/Proxy.lua",
@@ -93,7 +94,8 @@ client_scripts{
   "client/adminmenu.lua",
   "client/LsCustomsMenu.lua",
   "client/LsCustoms.lua",
-  "client/warningsystem.lua"
+  "client/warningsystem.lua",
+  "client/housing.lua"
   -- "hotkeys/hotkeys.lua"
 }
 
