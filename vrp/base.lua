@@ -226,7 +226,7 @@ function vRP.getUserIdByIdentifiers(ids, cbr)
             if i <= #ids then
                 if not config.ignore_ip_identifier or (string.find(ids[i], "ip:") == nil) then  -- ignore ip identifier
                     MySQL.query("vRP/userid_byidentifier", {identifier = ids[i]}, function(rows, affected)
-                        if #rows > 0 then  -- found
+                        if rows and #rows > 0 then  -- found
                             task({rows[1].user_id})
                         else -- not found
                             search()
@@ -237,7 +237,7 @@ function vRP.getUserIdByIdentifiers(ids, cbr)
                 end
             else -- no ids found, create user
                 MySQL.query("vRP/create_user", {}, function(rows, affected)
-                    if rows.affectedRows > 0 then
+                    if rows and rows.affectedRows > 0 then
                         local user_id = rows.insertId
                         -- add identifiers
                         for l,w in pairs(ids) do
@@ -458,11 +458,13 @@ end
 function vRP.IdentifierBanCheck(source,user_id,cb)
     for i,v in pairs(GetPlayerIdentifiers(source)) do 
         MySQL.query('vRP/identifier_all', {identifier = v}, function(rows)
-            for i = 1,#rows do 
-                if rows[i].banned then 
-                    if user_id ~= rows[i].user_id then 
-                        cb(true, rows[i].user_id)
-                    end 
+            if rows then 
+                for i = 1,#rows do 
+                    if rows[i].banned then 
+                        if user_id ~= rows[i].user_id then 
+                            cb(true, rows[i].user_id)
+                        end 
+                    end
                 end
             end
         end)
