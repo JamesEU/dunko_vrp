@@ -1,9 +1,40 @@
 local cfg = module("cfg/homes")
 local entry_points = cfg.homes
 local inHouseMarker = false;
+local ownedHouse = false;
+local isHouseForSale = false;
+local ownerOfHouse = "";
+
+RMenu.Add('vRPHouse', 'main', RageUI.CreateMenu("Real Estate", "~b~Housing",1250,100))
 
 
 
+RageUI.CreateWhile(1.0, true, function()
+
+    if RageUI.Visible(RMenu:Get('vRPHouse', 'main')) then
+        RageUI.DrawContent({ header = true, glare = true, instructionalButton = true}, function()
+            if ownedHouse then 
+                RageUI.Button("Enter House", "", {}, true, function(Hovered, Active, Selected) 
+                end)
+                RageUI.Button("Sell House", "", {}, true, function(Hovered, Active, Selected) 
+                end)
+            end
+            if isHouseForSale then 
+                RageUI.Button("Buy House", "", {}, true, function(Hovered, Active, Selected) 
+                end)
+            end
+            if not isHouseForSale then 
+                RageUI.Button("Request to Enter House", "", {}, true, function(Hovered, Active, Selected) 
+                end) 
+            end
+            if not ownedHouse then 
+                
+                RageUI.Button("Owner", "The Owner Is: " .. ownerOfHouse, {}, true, function(Hovered, Active, Selected) 
+                end)
+            end
+        end)
+    end
+end)
 
 
 
@@ -27,9 +58,9 @@ Citizen.CreateThread(function()
     while true do 
         Wait(0)
         if inHouseMarker and not MenuOpen then 
-
+            RageUI.Visible(RMenu:Get('vRPHouse', 'main'), true) 
         elseif not inHouseMarker and  MenuOpen then 
-
+            RageUI.ActuallyCloseAll()
         end
     end
 end)
