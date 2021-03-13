@@ -43,11 +43,13 @@ Citizen.CreateThread(function()
     while true do 
         Wait(250)
         local plrCoord = GetEntityCoords(PlayerPedId())
+        inHouseMarker = false;
         for i,v in pairs(entry_points) do 
             local name = i
             local enternacex,enterancey,enterancez = v.entry_point[1], v.entry_point[2], v.entry_point[3]
-            if #(plrCoord - vec3(enternacex,enterancey,enterancez)) <= 5.0 then 
+            if #(plrCoord - vec3(enternacex,enterancey,enterancez)) <= 3.0 then 
                 inHouseMarker = true; 
+                break
             end
         end
     end
@@ -59,8 +61,10 @@ Citizen.CreateThread(function()
         Wait(0)
         if inHouseMarker and not MenuOpen then 
             RageUI.Visible(RMenu:Get('vRPHouse', 'main'), true) 
+            MenuOpen = true;
         elseif not inHouseMarker and  MenuOpen then 
             RageUI.ActuallyCloseAll()
+            MenuOpen = false;
         end
     end
 end)
