@@ -1,10 +1,13 @@
 local cfg = module("cfg/homes")
 local entry_points = cfg.homes
 local inHouseMarker = false;
+-- Housing Data
 local ownedHouse = false;
 local isHouseForSale = false;
 local ownerOfHouse = "";
-
+local slotName = "";
+-- Housing Data
+-- Made by JamesUK#6793
 RMenu.Add('vRPHouse', 'main', RageUI.CreateMenu("Real Estate", "~b~Housing",1250,100))
 
 
@@ -29,7 +32,7 @@ RageUI.CreateWhile(1.0, true, function()
             end
             if not ownedHouse then 
                 
-                RageUI.Button("Owner", "The Owner Is: " .. ownerOfHouse, {}, true, function(Hovered, Active, Selected) 
+                RageUI.Button("Owner of Property", "The Owner Is: " .. ownerOfHouse, {}, true, function(Hovered, Active, Selected) 
                 end)
             end
         end)
@@ -47,8 +50,9 @@ Citizen.CreateThread(function()
         for i,v in pairs(entry_points) do 
             local name = i
             local enternacex,enterancey,enterancez = v.entry_point[1], v.entry_point[2], v.entry_point[3]
-            if #(plrCoord - vec3(enternacex,enterancey,enterancez)) <= 3.0 then 
+            if #(plrCoord - vec3(enternacex,enterancey,enterancez)) <= 1.0 then 
                 inHouseMarker = true; 
+                slotName = v.slot
                 break
             end
         end
@@ -61,6 +65,7 @@ Citizen.CreateThread(function()
         Wait(0)
         if inHouseMarker and not MenuOpen then 
             RageUI.Visible(RMenu:Get('vRPHouse', 'main'), true) 
+            TriggerServerEvent('vRP:RequestHousingData',slotName)
             MenuOpen = true;
         elseif not inHouseMarker and  MenuOpen then 
             RageUI.ActuallyCloseAll()

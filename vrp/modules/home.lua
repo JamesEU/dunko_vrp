@@ -17,6 +17,14 @@ MySQL.createCommand("vRP/set_address","REPLACE INTO vrp_user_homes(user_id,home,
 
 -- api
 
+
+-- New Housing 
+RegisterNetEvent('vRP:RequestHousingData')
+AddEventHandler('vRP:RequestHousingData', function(slotName)
+    print(slotName)
+end)
+-- New Housing
+
 local components = {}
 
 -- cbreturn user address (home and number) or nil
