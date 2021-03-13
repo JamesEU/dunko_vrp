@@ -3,7 +3,7 @@
 
 local lang = vRP.lang
 local cfg = module("cfg/homes")
-
+local slots = cfg.slot_types
 -- sql
 
 
@@ -21,6 +21,8 @@ MySQL.createCommand("vRP/set_address","REPLACE INTO vrp_user_homes(user_id,home,
 -- New Housing 
 RegisterNetEvent('vRP:RequestHousingData')
 AddEventHandler('vRP:RequestHousingData', function(slotName)
+    local slotTable = slots[slotName][1]
+    
     print(slotName)
 end)
 -- New Housing

@@ -129,9 +129,11 @@ Citizen.CreateThread(function()
     user_id INTEGER,
     home VARCHAR(100),
     number INTEGER,
+    rented BOOLEAN NOT NULL DEFAULT 0,
+    rentedid varchar(200) NOT NULL DEFAULT '',
+    rentedtime varchar(2048) NOT NULL DEFAULT '',
     CONSTRAINT pk_user_homes PRIMARY KEY(user_id),
-    CONSTRAINT fk_user_homes_users FOREIGN KEY(user_id) REFERENCES vrp_users(id) ON DELETE CASCADE,
-    UNIQUE(home,number)
+    CONSTRAINT fk_user_homes_users FOREIGN KEY(user_id) REFERENCES vrp_users(id) ON DELETE CASCADE
     );
     ]])
     MySQL.SingleQuery([[
