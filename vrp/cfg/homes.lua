@@ -487,6 +487,7 @@ cfg.slot_types = {
 }
 
 -- define home clusters
+-- blip id and blip colour has been deprecated and will nolonger do anything.
 cfg.homes = {
   ["Rundown Trailor"] = {
     slot = "trevor_trailer",
