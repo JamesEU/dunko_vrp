@@ -6,6 +6,7 @@ local ownedHouse = false;
 local isHouseForSale = false;
 local ownerOfHouse = "";
 local slotName = "";
+local homeName = "";
 -- Housing Data
 -- Made by JamesUK#6793
 RMenu.Add('vRPHouse', 'main', RageUI.CreateMenu("Real Estate", "~b~Housing",1250,100))
@@ -53,6 +54,7 @@ Citizen.CreateThread(function()
             if #(plrCoord - vec3(enternacex,enterancey,enterancez)) <= 1.0 then 
                 inHouseMarker = true; 
                 slotName = v.slot
+                homeName = name
                 break
             end
         end
@@ -65,7 +67,7 @@ Citizen.CreateThread(function()
         Wait(0)
         if inHouseMarker and not MenuOpen then 
             RageUI.Visible(RMenu:Get('vRPHouse', 'main'), true) 
-            TriggerServerEvent('vRP:RequestHousingData',slotName)
+            TriggerServerEvent('vRP:RequestHousingData',slotName,homeName)
             MenuOpen = true;
         elseif not inHouseMarker and  MenuOpen then 
             RageUI.ActuallyCloseAll()
