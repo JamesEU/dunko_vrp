@@ -1,8 +1,8 @@
 exports.runcmd = (fivemexports, client, message, params) => {
-    if (!params[0] || !parseInt(params[0]) || !params[1]) {
+    if (!params[0] || !/^\d{1,10}$/.test(params[0]) || !params[1]) {
         return message.reply('Invalid args! Correct term is: ' + process.env.PREFIX + 'delcar [permid] [spawn code]')
     }
-    fivemexports.ghmattimysql.execute("DELETE FROM vrp_user_vehicles WHERE user_id = ? AND vehicle = ?", [params[0], params[1]], (result) => {
+    fivemexports.ghmattimysql.execute("DELETE FROM vrp_user_vehicles WHERE user_id = ? AND vehicle = ?", [parseInt(params[0]), params[1]], (result) => {
         if (result) {
             let embed = {
                 "title": "Remove Car",

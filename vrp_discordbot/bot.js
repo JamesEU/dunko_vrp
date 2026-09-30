@@ -134,9 +134,16 @@ const init = async() => {
 client.getPerms = function(msg) {
 
     let settings = settingsjson.settings
-    let lvl1 = msg.guild.roles.find(r => r.name === settings.Level1Perm);
-    let lvl2 = msg.guild.roles.find(r => r.name === settings.Level2Perm);
-    let lvl3 = msg.guild.roles.find(r => r.name === settings.Level3Perm);
+    if (!msg.guild || msg.guild.id !== settings.GuildID || !msg.member) return 0
+    let findRole = (value) => {
+        let role = msg.guild.roles.get(value)
+        if (role) return role
+        let matches = msg.guild.roles.filter(r => r.name === value)
+        return matches.size === 1 ? matches.first() : undefined
+    }
+    let lvl1 = findRole(settings.Level1Perm);
+    let lvl2 = findRole(settings.Level2Perm);
+    let lvl3 = findRole(settings.Level3Perm);
     if (!lvl1 || !lvl2 || !lvl3) {
         console.log(`[^1JamesUK Discord Bot^7]: Your permissions are not setup correctly and the bot will not function as intended.\nStatus: Level 1 Perm is: ${lvl1}, Level 2 Perm is: ${lvl2}, Level 3 Perm is ${lvl3}`)
     }
@@ -150,12 +157,12 @@ client.getPerms = function(msg) {
     // hot fix for Discord role caching 
 
     let level = 0;
-    if (msg.member.roles.has(lvl1.id)) {
-        level = 1;
-    } else if (msg.member.roles.has(lvl2.id)) {
-        level = 2;
-    } else if (msg.member.roles.has(lvl3.id)) {
+    if (lvl3 && msg.member.roles.has(lvl3.id)) {
         level = 3;
+    } else if (lvl2 && msg.member.roles.has(lvl2.id)) {
+        level = 2;
+    } else if (lvl1 && msg.member.roles.has(lvl1.id)) {
+        level = 1;
     }
     return level
 }
@@ -163,6 +170,7 @@ client.getPerms = function(msg) {
 client.on('message', (message) => {
     let client = message.client;
     if (message.author.bot) return;
+    if (!message.guild || message.guild.id !== settingsjson.settings.GuildID) return;
     if (!message.content.startsWith(process.env.PREFIX)) return;
     let command = message.content.split(' ')[0].slice(process.env.PREFIX.length);
     let params = message.content.split(' ').slice(1);
@@ -174,7 +182,7 @@ client.on('message', (message) => {
     if (cmd) {
         if (permissions < cmd.conf.perm) return;
         try {
-            cmd.runcmd(exports, client, message, params, permissions);
+            Promise.resolve(cmd.runcmd(exports, client, message, params, permissions)).catch(err => console.log(`[^1JamesUK Discord Bot^7]: ${err.message}`));
         } catch (err) {
             let embed = {
                 "title": "Error Occured!",

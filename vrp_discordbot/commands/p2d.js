@@ -1,6 +1,6 @@
 exports.runcmd = (fivemexports, client, message, params) => {
-    if (params[0] && parseInt(params[0])) {
-        fivemexports.ghmattimysql.execute("SELECT * FROM `vrp_user_ids` WHERE user_id = ?", [params[0]], (result) => {
+    if (params[0] && /^\d{1,10}$/.test(params[0])) {
+        fivemexports.ghmattimysql.execute("SELECT * FROM `vrp_user_ids` WHERE user_id = ?", [parseInt(params[0])], (result) => {
             if (result.length > 0) {
                 for (i = 0; i < result.length; i++) {
                     if (result[i].identifier.includes('discord')) {
