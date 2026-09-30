@@ -10,11 +10,22 @@ local LootBagEntities = {}
 
 
 
+local comaCooldown = {}
 function tvRP.Coma()
     local source = source
     if vRPConfig.LootBags then
-        Wait(3000) -- wait delay for death.
         local user_id = vRP.getUserId(source)
+        if user_id == nil or comaCooldown[user_id] then
+            return
+        end
+        comaCooldown[user_id] = true
+        SetTimeout(30000, function()
+            comaCooldown[user_id] = nil
+        end)
+        Wait(3000)
+        if not vRP.isPlayerDowned(source) then
+            return
+        end
         local model = GetHashKey('prop_cs_heist_bag_01')
         local name1 = GetPlayerName(source)
         local lootbag = CreateObjectNoOffset(model, GetEntityCoords(GetPlayerPed(source)) + 0.4, true, true, false)

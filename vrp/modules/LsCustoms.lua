@@ -16,11 +16,29 @@ local tbl = {
 
 RegisterServerEvent('lockGarage')
 AddEventHandler('lockGarage', function(b,garage)
-	tbl[tonumber(garage)].locked = b
-	if not b then
-		tbl[tonumber(garage)].player = nil
+	local source = source
+	local g = tbl[tonumber(garage)]
+	if not g then
+		return
+	end
+	if b then
+		if g.locked and g.player ~= source then
+			return
+		end
+		for i,other in pairs(tbl) do
+			if other ~= g and other.player == source then
+				other.locked = false
+				other.player = nil
+			end
+		end
+		g.locked = true
+		g.player = source
 	else
-		tbl[tonumber(garage)].player = source
+		if g.player ~= source then
+			return
+		end
+		g.locked = false
+		g.player = nil
 	end
 	TriggerClientEvent('lockGarage',-1,tbl)
 end)
@@ -46,8 +64,12 @@ RegisterServerEvent("LSC:buttonSelected")
 AddEventHandler("LSC:buttonSelected", function(name, button)
 	local source = source
 	local user_id = vRP.getUserId(source)
-	if user_id then
-		TriggerClientEvent("LSC:buttonSelected", source, name, button, vRP.tryFullPayment(vRP.getUserId(source), button.price or 0)) -- money
+	if user_id and type(button) == "table" then
+		local price = tonumber(button.price or 0)
+		if price == nil or price ~= price or price < 0 then
+			return
+		end
+		TriggerClientEvent("LSC:buttonSelected", source, name, button, vRP.tryFullPayment(user_id, price))
 	end
 end)
 

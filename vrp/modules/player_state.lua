@@ -1,6 +1,74 @@
 local cfg = module("cfg/player_state")
+local cfg_client = module("cfg/client")
 local log_config = module("servercfg/cfg_webhooks")
 local lang = vRP.lang
+
+local function isFiniteNumber(n)
+    return type(n) == "number" and n == n and n > -math.huge and n < math.huge
+end
+
+function vRP.sanitizeWeapons(weapons)
+    local sanitized = {}
+    if type(weapons) == "table" then
+        local count = 0
+        for k, v in pairs(weapons) do
+            if count >= 100 then
+                break
+            end
+            if type(k) == "string" and #k <= 64 and string.match(k, "^WEAPON_[%w_]+$") and type(v) == "table" then
+                local ammo = tonumber(v.ammo) or 0
+                if not isFiniteNumber(ammo) then
+                    ammo = 0
+                end
+                sanitized[k] = {ammo = math.max(0, math.min(math.floor(ammo), 9999))}
+                count = count + 1
+            end
+        end
+    end
+    return sanitized
+end
+
+local function sanitizeCustomization(customization)
+    if type(customization) ~= "table" then
+        return nil
+    end
+    local sanitized = {}
+    local count = 0
+    for k, v in pairs(customization) do
+        if count >= 64 then
+            break
+        end
+        local validKey = (type(k) == "string" and #k <= 32) or (isFiniteNumber(k) and k == math.floor(k))
+        if validKey then
+            if isFiniteNumber(v) then
+                sanitized[k] = v
+                count = count + 1
+            elseif type(v) == "string" and #v <= 64 then
+                sanitized[k] = v
+                count = count + 1
+            elseif type(v) == "table" then
+                local entry = {}
+                for i = 1, 3 do
+                    if not isFiniteNumber(v[i]) then
+                        break
+                    end
+                    entry[i] = v[i]
+                end
+                sanitized[k] = entry
+                count = count + 1
+            end
+        end
+    end
+    return sanitized
+end
+
+function vRP.isPlayerDowned(source)
+    local ped = GetPlayerPed(source)
+    if ped == nil or ped == 0 or not DoesEntityExist(ped) then
+        return true
+    end
+    return GetEntityHealth(ped) <= cfg_client.coma_threshold
+end
 
 -- client -> server events
 AddEventHandler("vRP:playerSpawn", function(user_id, source, first_spawn)
@@ -120,6 +188,10 @@ function tvRP.updatePos(x, y, z)
     if user_id ~= nil then
         local data = vRP.getUserDataTable(user_id)
         local tmp = vRP.getUserTmpTable(user_id)
+        x, y, z = tonumber(x), tonumber(y), tonumber(z)
+        if not (isFiniteNumber(x) and isFiniteNumber(y) and isFiniteNumber(z)) then
+            return
+        end
         if data ~= nil and (tmp == nil or tmp.home_stype == nil) then -- don't save position if inside home slot
             data.position = {
                 x = tonumber(x),
@@ -135,7 +207,7 @@ function tvRP.updateWeapons(weapons)
     if user_id ~= nil then
         local data = vRP.getUserDataTable(user_id)
         if data ~= nil then
-            data.weapons = weapons
+            data.weapons = vRP.sanitizeWeapons(weapons)
         end
     end
 end
@@ -144,7 +216,8 @@ function tvRP.updateCustomization(customization)
     local user_id = vRP.getUserId(source)
     if user_id ~= nil then
         local data = vRP.getUserDataTable(user_id)
-        if data ~= nil then
+        customization = sanitizeCustomization(customization)
+        if data ~= nil and customization ~= nil then
             data.customization = customization
         end
     end
@@ -154,7 +227,8 @@ function tvRP.updateHealth(health)
     local user_id = vRP.getUserId(source)
     if user_id ~= nil then
         local data = vRP.getUserDataTable(user_id)
-        if data ~= nil then
+        health = tonumber(health)
+        if data ~= nil and isFiniteNumber(health) then
             data.health = health
         end
     end
@@ -164,7 +238,8 @@ function tvRP.updateArmour(armour)
     local user_id = vRP.getUserId(source)
     if user_id ~= nil then
         local data = vRP.getUserDataTable(user_id)
-        if data ~= nil then
+        armour = tonumber(armour)
+        if data ~= nil and isFiniteNumber(armour) then
             data.armour = armour
         end
     end
@@ -174,23 +249,31 @@ local isStoring = {}
 function tvRP.StoreWeaponsDead()
     local player = source 
     local user_id = vRP.getUserId(player)
+    if user_id == nil then
+        return
+    end
+    if isStoring[user_id] then
+        vRPclient.notify(player,{"~o~Your weapons are already being stored hmm..."})
+        return
+    end
+    isStoring[user_id] = true
+    SetTimeout(30000,function()
+        isStoring[user_id] = nil 
+    end)
+    Wait(1000)
+    if not vRP.isPlayerDowned(player) then
+        return
+    end
 	vRPclient.getWeapons(player,{},function(weapons)
-        if not isStoring[player] then
-            isStoring[player] = true
-            vRPclient.giveWeapons(player,{{},true}, function(removedwep)
-                for k,v in pairs(weapons) do
-                    vRP.giveInventoryItem(user_id, "wbody|"..k, 1, true)
-                    if v.ammo > 0 then
-                        vRP.giveInventoryItem(user_id, "wammo|"..k, v.ammo, true)
-                    end
+        weapons = vRP.sanitizeWeapons(weapons)
+        vRPclient.giveWeapons(player,{{},true}, function(removedwep)
+            for k,v in pairs(weapons) do
+                vRP.giveInventoryItem(user_id, "wbody|"..k, 1, true)
+                if v.ammo > 0 then
+                    vRP.giveInventoryItem(user_id, "wammo|"..k, v.ammo, true)
                 end
-                vRPclient.notify(player,{"~g~Weapons Stored"})
-                SetTimeout(10000,function()
-                    isStoring[player] = nil 
-                end)
-            end)
-        else
-            vRPclient.notify(player,{"~o~Your weapons are already being stored hmm..."})
-        end
+            end
+            vRPclient.notify(player,{"~g~Weapons Stored"})
+        end)
 	end)
 end

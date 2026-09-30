@@ -187,7 +187,7 @@ end
 
 -- receive prompt result
 function tvRP.promptResult(text)
-  if text == nil then
+  if type(text) ~= "string" then
     text = ""
   end
 
