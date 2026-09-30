@@ -28,6 +28,87 @@ function vRP.sanitizeWeapons(weapons)
     return sanitized
 end
 
+local recent_weapon_gives = {}
+local weapon_give_grace = 10000
+
+AddEventHandler("vRP:playerLeave", function(user_id, source)
+    recent_weapon_gives[user_id] = nil
+end)
+
+local function mergeWeapons(user_id, weapons, clear_before)
+    local data = vRP.getUserDataTable(user_id)
+    if data == nil then
+        return
+    end
+    if clear_before or type(data.weapons) ~= "table" then
+        data.weapons = {}
+        recent_weapon_gives[user_id] = {}
+    end
+    local recent = recent_weapon_gives[user_id] or {}
+    recent_weapon_gives[user_id] = recent
+    for k, v in pairs(vRP.sanitizeWeapons(weapons)) do
+        local current = data.weapons[k]
+        local ammo = v.ammo + (current and tonumber(current.ammo) or 0)
+        data.weapons[k] = {ammo = math.min(ammo, 9999)}
+        recent[k] = GetGameTimer()
+    end
+end
+
+local rawGiveWeapons = vRPclient.giveWeapons
+vRPclient.giveWeapons = function(dest, args, cb)
+    local user_id = vRP.getUserId(dest)
+    if user_id ~= nil and type(args) == "table" then
+        mergeWeapons(user_id, args[1], args[2])
+    end
+    return rawGiveWeapons(dest, args, cb)
+end
+
+function vRP.giveWeapons(source, weapons, clear_before)
+    vRPclient.giveWeapons(source, {weapons, clear_before})
+end
+
+function vRP.hasWeapon(user_id, weapon)
+    if not vRPConfig.ServerSideWeapons then
+        return true
+    end
+    local data = vRP.getUserDataTable(user_id)
+    return data ~= nil and type(data.weapons) == "table" and data.weapons[weapon] ~= nil
+end
+
+function vRP.reconcileWeapons(user_id, reported)
+    reported = vRP.sanitizeWeapons(reported)
+    local data = vRP.getUserDataTable(user_id)
+    if data == nil then
+        return {}
+    end
+    if not vRPConfig.ServerSideWeapons then
+        data.weapons = reported
+        return reported
+    end
+    local ledger = type(data.weapons) == "table" and data.weapons or {}
+    local recent = recent_weapon_gives[user_id] or {}
+    local now = GetGameTimer()
+    local result = {}
+    local budget = 0
+    for k, v in pairs(ledger) do
+        if recent[k] and now - recent[k] < weapon_give_grace then
+            result[k] = {ammo = tonumber(v.ammo) or 0}
+        else
+            recent[k] = nil
+            budget = budget + (tonumber(v.ammo) or 0)
+        end
+    end
+    for k, v in pairs(reported) do
+        if ledger[k] ~= nil and result[k] == nil then
+            local ammo = math.min(v.ammo, budget)
+            budget = budget - ammo
+            result[k] = {ammo = ammo}
+        end
+    end
+    data.weapons = result
+    return result
+end
+
 local function sanitizeCustomization(customization)
     if type(customization) ~= "table" then
         return nil
@@ -205,10 +286,7 @@ end
 function tvRP.updateWeapons(weapons)
     local user_id = vRP.getUserId(source)
     if user_id ~= nil then
-        local data = vRP.getUserDataTable(user_id)
-        if data ~= nil then
-            data.weapons = vRP.sanitizeWeapons(weapons)
-        end
+        vRP.reconcileWeapons(user_id, weapons)
     end
 end
 
@@ -265,7 +343,7 @@ function tvRP.StoreWeaponsDead()
         return
     end
 	vRPclient.getWeapons(player,{},function(weapons)
-        weapons = vRP.sanitizeWeapons(weapons)
+        weapons = vRP.reconcileWeapons(user_id, weapons)
         vRPclient.giveWeapons(player,{{},true}, function(removedwep)
             for k,v in pairs(weapons) do
                 vRP.giveInventoryItem(user_id, "wbody|"..k, 1, true)

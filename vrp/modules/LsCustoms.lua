@@ -14,6 +14,152 @@ local tbl = {
 	[6] = {locked = false, player = nil},
 }
 
+local garage_positions = {
+	[1] = {-337.3863, -136.9247, 38.5737},
+	[2] = {733.69, -1088.74, 21.733},
+	[3] = {-1155.077, -2006.61, 12.465},
+	[4] = {1174.823, 2637.807, 37.045},
+	[5] = {108.842, 6628.447, 31.072},
+	[6] = {-212.368, -1325.486, 30.176},
+}
+
+local lsc_wheel_lists = {"frontwheel", "backwheel", "sportwheels", "suvwheels", "offroadwheels", "tunerwheels", "highendwheels", "lowriderwheels", "musclewheels"}
+local lsc_color_categories = {"chrome", "classic", "matte", "metallic", "metal", "chrome2", "classic2", "matte2", "metallic2", "metal2", "wheelcolor", "trim"}
+
+local function nearGarage(source, index)
+	local pos = garage_positions[index]
+	if pos == nil then
+		return false
+	end
+	local ped = GetPlayerPed(source)
+	if ped == nil or ped == 0 or not DoesEntityExist(ped) then
+		return true
+	end
+	local coords = GetEntityCoords(ped)
+	local dx, dy, dz = coords.x - pos[1], coords.y - pos[2], coords.z - pos[3]
+	return math.sqrt(dx*dx + dy*dy + dz*dz) <= 50.0
+end
+
+local function inGarage(source)
+	for i, g in pairs(tbl) do
+		if g.locked and g.player == source then
+			return nearGarage(source, i)
+		end
+	end
+	return false
+end
+
+local function sameColour(a, b)
+	return type(a) == "table" and type(b) == "table" and a[1] == b[1] and a[2] == b[2] and a[3] == b[3]
+end
+
+local function lowestPrice(current, value)
+	value = tonumber(value) or 0
+	if current == nil or value < current then
+		return value
+	end
+	return current
+end
+
+local function minimumPrice(button)
+	local prices = type(LSC_Config) == "table" and LSC_Config.prices or nil
+	if type(prices) ~= "table" then
+		return 0
+	end
+	local best = nil
+	if button.name == "Repair vehicle" then
+		return 250
+	end
+	if button.modtype ~= nil then
+		local mod = tonumber(button.mod)
+		if button.wtype ~= nil then
+			for _, list in ipairs(lsc_wheel_lists) do
+				for _, entry in ipairs(prices[list] or {}) do
+					if entry.wtype == button.wtype and entry.mod == mod then
+						best = lowestPrice(best, entry.price)
+					end
+				end
+			end
+			return best or 0
+		end
+		local modcfg = type(prices.mods) == "table" and prices.mods[tonumber(button.modtype)] or nil
+		if mod == nil or mod < 0 or type(modcfg) ~= "table" then
+			return 0
+		end
+		if modcfg.startprice then
+			return tonumber(modcfg.startprice) or 0
+		end
+		for _, entry in ipairs(modcfg) do
+			if entry.mod == mod then
+				best = lowestPrice(best, entry.price)
+			end
+		end
+		return best or 0
+	end
+	if button.colorindex ~= nil then
+		for _, key in ipairs(lsc_color_categories) do
+			local category = prices[key]
+			if type(category) == "table" and type(category.colors) == "table" then
+				for _, colour in ipairs(category.colors) do
+					if colour.colorindex == button.colorindex then
+						best = lowestPrice(best, category.price)
+						break
+					end
+				end
+			end
+		end
+		return best or 0
+	end
+	if button.tint ~= nil then
+		for _, entry in ipairs(prices.windowtint or {}) do
+			if entry.tint == button.tint then
+				best = lowestPrice(best, entry.price)
+			end
+		end
+		return best or 0
+	end
+	if button.plateindex ~= nil then
+		for _, entry in ipairs(prices.plates or {}) do
+			if entry.plateindex == button.plateindex then
+				best = lowestPrice(best, entry.price)
+			end
+		end
+		return best or 0
+	end
+	if button.xenon ~= nil then
+		for _, entry in ipairs(prices.xenoncolor or {}) do
+			if entry.xenon == button.xenon then
+				best = lowestPrice(best, entry.price)
+			end
+		end
+		return best or 0
+	end
+	if button.neon ~= nil then
+		for _, entry in ipairs(prices.neoncolor or {}) do
+			if sameColour(entry.neon, button.neon) then
+				best = lowestPrice(best, entry.price)
+			end
+		end
+		return best or 0
+	end
+	if button.smokecolor ~= nil then
+		for _, entry in ipairs(prices.wheelaccessories or {}) do
+			if sameColour(entry.smokecolor, button.smokecolor) then
+				best = lowestPrice(best, entry.price)
+			end
+		end
+		return best or 0
+	end
+	for _, key in ipairs({"wheelaccessories", "neonlayout"}) do
+		for _, entry in ipairs(prices[key] or {}) do
+			if entry.smokecolor == nil and entry.name == button.name then
+				best = lowestPrice(best, entry.price)
+			end
+		end
+	end
+	return best or 0
+end
+
 RegisterServerEvent('lockGarage')
 AddEventHandler('lockGarage', function(b,garage)
 	local source = source
@@ -23,6 +169,9 @@ AddEventHandler('lockGarage', function(b,garage)
 	end
 	if b then
 		if g.locked and g.player ~= source then
+			return
+		end
+		if not nearGarage(source, tonumber(garage)) then
 			return
 		end
 		for i,other in pairs(tbl) do
@@ -64,9 +213,9 @@ RegisterServerEvent("LSC:buttonSelected")
 AddEventHandler("LSC:buttonSelected", function(name, button)
 	local source = source
 	local user_id = vRP.getUserId(source)
-	if user_id and type(button) == "table" then
+	if user_id and type(button) == "table" and inGarage(source) then
 		local price = tonumber(button.price or 0)
-		if price == nil or price ~= price or price < 0 then
+		if price == nil or price ~= price or price < minimumPrice(button) then
 			return
 		end
 		TriggerClientEvent("LSC:buttonSelected", source, name, button, vRP.tryFullPayment(user_id, price))
@@ -77,7 +226,7 @@ RegisterServerEvent("LSC:finished")
 AddEventHandler("LSC:finished", function(veh)
 	local source = source
 	local user_id = vRP.getUserId(source)
-	if user_id then
+	if user_id and type(veh) == "table" and type(veh.model) == "string" and inGarage(source) then
 		MySQL.execute("vRPls/update_vehicle_modifications", {user_id = user_id, vehicle = veh.model, modifications = json.encode({color = veh.color, extraColor = veh.extracolor, neon = veh.neon, neonColor = veh.neoncolor, xenonColor = veh.xenoncolor, smokeColor = veh.smokecolor, wheelType = veh.wheeltype, bulletProofTyres = veh.bulletProofTyres, windowTint = veh.windowtint, plateIndex = veh.plateindex, mods = veh.mods})})
 	end
 end)
