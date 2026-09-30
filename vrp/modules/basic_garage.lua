@@ -17,7 +17,16 @@ MySQL.createCommand("vRP/sell_vehicle_player","UPDATE vrp_user_vehicles SET user
 MySQL.createCommand("vRP/rentedupdate", "UPDATE vrp_user_vehicles SET user_id = @id, rented = @rented, rentedid = @rentedid, rentedtime = @rentedunix WHERE user_id = @user_id AND vehicle = @veh")
 MySQL.createCommand("vRP/fetch_rented_vehs", "SELECT * FROM vrp_user_vehicles WHERE rented = 1")
 MySQL.createCommand("vRP/transfer_owned_vehicle","UPDATE vrp_user_vehicles SET user_id = @user_id, vehicle_plate = @registration WHERE user_id = @oldUser AND vehicle = @vehicle AND rented = 0")
+MySQL.createCommand("vRP/garage_add_bank","UPDATE vrp_user_moneys SET bank = bank + @amount WHERE user_id = @user_id")
 MySQL.createCommand("vRP/rent_owned_vehicle","UPDATE vrp_user_vehicles SET user_id = @id, rented = 1, rentedid = @rentedid, rentedtime = @rentedunix WHERE user_id = @user_id AND vehicle = @veh AND rented = 0")
+local function payBank(user_id, amount)
+    if vRP.getUserTmpTable(user_id) ~= nil then
+        vRP.giveBankMoney(user_id, amount)
+    elseif amount > 0 then
+        MySQL.execute("vRP/garage_add_bank", {user_id = user_id, amount = amount})
+    end
+end
+
 --RageUI Implementation by JamesUK#6793.
 
 --PHONE GARAGES ARE NOT SUPPORTED DO NOT EVEN ASK.
@@ -214,24 +223,24 @@ AddEventHandler('vRP:SellVehicle', function(veh)
                                                                     MySQL.query("vRP/transfer_owned_vehicle", {user_id = pID, registration = "P "..registration, oldUser = playerID, vehicle = name}, function(rows)
                                                                         if rows and rows.affectedRows and rows.affectedRows > 0 then
                                                                             vRPclient.despawnGarageVehicle(player,{'car',15})
-                                                                            vRP.giveBankMoney(playerID, amount)
-                                                                            vRPclient.notify(player,{"~g~You have successfully sold the vehicle to ".. GetPlayerName(target).." for $"..amount.."!"})
-                                                                            vRPclient.notify(target,{"~g~"..GetPlayerName(player).." has successfully sold you the car for $"..amount.."!"})
+                                                                            payBank(playerID, amount)
+                                                                            vRPclient.notify(player,{"~g~You have successfully sold the vehicle to ".. (GetPlayerName(target) or "").." for $"..amount.."!"})
+                                                                            vRPclient.notify(target,{"~g~"..(GetPlayerName(player) or "").." has successfully sold you the car for $"..amount.."!"})
                                                                             TriggerClientEvent('vRP:CloseGarage', player)
                                                                         else
-                                                                            vRP.giveBankMoney(pID, amount)
+                                                                            payBank(pID, amount)
                                                                             vRPclient.notify(player,{"~r~The sale failed, you no longer own this vehicle."})
                                                                             vRPclient.notify(target,{"~r~The sale failed, you have been refunded."})
                                                                         end
                                                                     end)
                                                                 end)
                                                             else
-                                                                vRPclient.notify(player,{"~r~".. GetPlayerName(target).." doesn't have enough money!"})
+                                                                vRPclient.notify(player,{"~r~".. (GetPlayerName(target) or "").." doesn't have enough money!"})
                                                                 vRPclient.notify(target,{"~r~You don't have enough money!"})
                                                             end
                                                         else
-                                                            vRPclient.notify(player,{"~r~"..GetPlayerName(target).." has refused to buy the car."})
-                                                            vRPclient.notify(target,{"~r~You have refused to buy "..GetPlayerName(player).."'s car."})
+                                                            vRPclient.notify(player,{"~r~"..(GetPlayerName(target) or "").." has refused to buy the car."})
+                                                            vRPclient.notify(target,{"~r~You have refused to buy "..(GetPlayerName(player) or "").."'s car."})
                                                         end
                                                     end)
                                                 end
@@ -298,23 +307,23 @@ AddEventHandler('vRP:RentVehicle', function(veh)
                                                                         MySQL.query("vRP/rent_owned_vehicle", {user_id = playerID, veh = name, id = pID, rentedid = playerID, rentedunix = rentedTime}, function(rows)
                                                                             if rows and rows.affectedRows and rows.affectedRows > 0 then
                                                                                 vRPclient.despawnGarageVehicle(player,{'car',15})
-                                                                                vRP.giveBankMoney(playerID, amount)
-                                                                                vRPclient.notify(player,{"~g~You have successfully rented the vehicle to ".. GetPlayerName(target).." for $"..amount.."!" .. ' | for: ' .. rent .. 'hours'})
-                                                                                vRPclient.notify(target,{"~g~"..GetPlayerName(player).." has successfully rented you the car for $"..amount.."!" .. ' | for: ' .. rent .. 'hours'})
+                                                                                payBank(playerID, amount)
+                                                                                vRPclient.notify(player,{"~g~You have successfully rented the vehicle to ".. (GetPlayerName(target) or "").." for $"..amount.."!" .. ' | for: ' .. rent .. 'hours'})
+                                                                                vRPclient.notify(target,{"~g~"..(GetPlayerName(player) or "").." has successfully rented you the car for $"..amount.."!" .. ' | for: ' .. rent .. 'hours'})
                                                                                 TriggerClientEvent('vRP:CloseGarage', player)
                                                                             else
-                                                                                vRP.giveBankMoney(pID, amount)
+                                                                                payBank(pID, amount)
                                                                                 vRPclient.notify(player,{"~r~The rental failed, you no longer own this vehicle."})
                                                                                 vRPclient.notify(target,{"~r~The rental failed, you have been refunded."})
                                                                             end
                                                                         end)
                                                                     else
-                                                                        vRPclient.notify(player,{"~r~".. GetPlayerName(target).." doesn't have enough money!"})
+                                                                        vRPclient.notify(player,{"~r~".. (GetPlayerName(target) or "").." doesn't have enough money!"})
                                                                         vRPclient.notify(target,{"~r~You don't have enough money!"})
                                                                     end
                                                                 else
-                                                                    vRPclient.notify(player,{"~r~"..GetPlayerName(target).." has refused to rent the car."})
-                                                                    vRPclient.notify(target,{"~r~You have refused to rent "..GetPlayerName(player).."'s car."})
+                                                                    vRPclient.notify(player,{"~r~"..(GetPlayerName(target) or "").." has refused to rent the car."})
+                                                                    vRPclient.notify(target,{"~r~You have refused to rent "..(GetPlayerName(player) or "").."'s car."})
                                                                 end
                                                             end)
                                                         end

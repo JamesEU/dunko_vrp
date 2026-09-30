@@ -31,9 +31,18 @@ end
 local recent_weapon_gives = {}
 local weapon_give_grace = 10000
 
+local storing_weapons = {}
+local last_weapon_store = {}
+
 AddEventHandler("vRP:playerLeave", function(user_id, source)
     recent_weapon_gives[user_id] = nil
+    storing_weapons[user_id] = nil
+    last_weapon_store[user_id] = nil
 end)
+
+function vRP.isStoringWeapons(user_id)
+    return storing_weapons[user_id] ~= nil
+end
 
 local function mergeWeapons(user_id, weapons, clear_before)
     local data = vRP.getUserDataTable(user_id)
@@ -75,7 +84,7 @@ function vRP.hasWeapon(user_id, weapon)
     return data ~= nil and type(data.weapons) == "table" and data.weapons[weapon] ~= nil
 end
 
-function vRP.reconcileWeapons(user_id, reported)
+function vRP.reconcileWeapons(user_id, reported, strict)
     reported = vRP.sanitizeWeapons(reported)
     local data = vRP.getUserDataTable(user_id)
     if data == nil then
@@ -91,7 +100,7 @@ function vRP.reconcileWeapons(user_id, reported)
     local result = {}
     local budget = 0
     for k, v in pairs(ledger) do
-        if recent[k] and now - recent[k] < weapon_give_grace then
+        if not strict and recent[k] and now - recent[k] < weapon_give_grace then
             result[k] = {ammo = tonumber(v.ammo) or 0}
         else
             recent[k] = nil
@@ -323,33 +332,41 @@ function tvRP.updateArmour(armour)
     end
 end
 
-local isStoring = {}
 function tvRP.StoreWeaponsDead()
     local player = source 
     local user_id = vRP.getUserId(player)
     if user_id == nil then
         return
     end
-    if isStoring[user_id] then
+    if storing_weapons[user_id] or (last_weapon_store[user_id] and GetGameTimer() - last_weapon_store[user_id] < 15000) then
         vRPclient.notify(player,{"~o~Your weapons are already being stored hmm..."})
         return
     end
-    isStoring[user_id] = true
-    SetTimeout(30000,function()
-        isStoring[user_id] = nil 
+    local token = {}
+    storing_weapons[user_id] = token
+    last_weapon_store[user_id] = GetGameTimer()
+    SetTimeout(15000,function()
+        if storing_weapons[user_id] == token then
+            storing_weapons[user_id] = nil
+        end
     end)
     Wait(1000)
     if not vRP.isPlayerDowned(player) then
+        storing_weapons[user_id] = nil
+        last_weapon_store[user_id] = nil
         return
     end
 	vRPclient.getWeapons(player,{},function(weapons)
-        weapons = vRP.reconcileWeapons(user_id, weapons)
+        weapons = vRP.reconcileWeapons(user_id, weapons, true)
         vRPclient.giveWeapons(player,{{},true}, function(removedwep)
             for k,v in pairs(weapons) do
                 vRP.giveInventoryItem(user_id, "wbody|"..k, 1, true)
                 if v.ammo > 0 then
                     vRP.giveInventoryItem(user_id, "wammo|"..k, v.ammo, true)
                 end
+            end
+            if storing_weapons[user_id] == token then
+                storing_weapons[user_id] = nil
             end
             vRPclient.notify(player,{"~g~Weapons Stored"})
         end)

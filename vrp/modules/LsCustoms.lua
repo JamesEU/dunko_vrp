@@ -14,29 +14,20 @@ local tbl = {
 	[6] = {locked = false, player = nil},
 }
 
-local garage_positions = {
-	[1] = {-337.3863, -136.9247, 38.5737},
-	[2] = {733.69, -1088.74, 21.733},
-	[3] = {-1155.077, -2006.61, 12.465},
-	[4] = {1174.823, 2637.807, 37.045},
-	[5] = {108.842, 6628.447, 31.072},
-	[6] = {-212.368, -1325.486, 30.176},
-}
-
 local lsc_wheel_lists = {"frontwheel", "backwheel", "sportwheels", "suvwheels", "offroadwheels", "tunerwheels", "highendwheels", "lowriderwheels", "musclewheels"}
 local lsc_color_categories = {"chrome", "classic", "matte", "metallic", "metal", "chrome2", "classic2", "matte2", "metallic2", "metal2", "wheelcolor", "trim"}
 
 local function nearGarage(source, index)
-	local pos = garage_positions[index]
+	local garage = type(LSC_Config) == "table" and type(LSC_Config.garages) == "table" and LSC_Config.garages[index] or nil
+	local pos = garage and garage.inside
 	if pos == nil then
 		return false
 	end
-	local ped = GetPlayerPed(source)
-	if ped == nil or ped == 0 or not DoesEntityExist(ped) then
+	local coords = vRP.getPlayerCoords(source)
+	if coords == nil then
 		return true
 	end
-	local coords = GetEntityCoords(ped)
-	local dx, dy, dz = coords.x - pos[1], coords.y - pos[2], coords.z - pos[3]
+	local dx, dy, dz = coords.x - pos.x, coords.y - pos.y, coords.z - pos.z
 	return math.sqrt(dx*dx + dy*dy + dz*dz) <= 50.0
 end
 
@@ -64,15 +55,18 @@ end
 local function minimumPrice(button)
 	local prices = type(LSC_Config) == "table" and LSC_Config.prices or nil
 	if type(prices) ~= "table" then
-		return 0
+		return nil
 	end
 	local best = nil
 	if button.name == "Repair vehicle" then
 		return 250
 	end
 	if button.modtype ~= nil then
-		local mod = tonumber(button.mod)
-		if button.wtype ~= nil then
+		local modtype, mod = tonumber(button.modtype), tonumber(button.mod)
+		if mod == nil then
+			return nil
+		end
+		if (modtype == 23 or modtype == 24) and button.wtype ~= nil then
 			for _, list in ipairs(lsc_wheel_lists) do
 				for _, entry in ipairs(prices[list] or {}) do
 					if entry.wtype == button.wtype and entry.mod == mod then
@@ -80,43 +74,51 @@ local function minimumPrice(button)
 					end
 				end
 			end
-			return best or 0
+			return best
 		end
-		local modcfg = type(prices.mods) == "table" and prices.mods[tonumber(button.modtype)] or nil
-		if mod == nil or mod < 0 or type(modcfg) ~= "table" then
+		if mod < 0 then
 			return 0
 		end
+		local modcfg = type(prices.mods) == "table" and prices.mods[modtype] or nil
+		if type(modcfg) ~= "table" then
+			return nil
+		end
 		if modcfg.startprice then
-			return tonumber(modcfg.startprice) or 0
+			return tonumber(modcfg.startprice)
 		end
 		for _, entry in ipairs(modcfg) do
 			if entry.mod == mod then
 				best = lowestPrice(best, entry.price)
 			end
 		end
-		return best or 0
+		return best
 	end
 	if button.colorindex ~= nil then
+		local known = false
 		for _, key in ipairs(lsc_color_categories) do
 			local category = prices[key]
 			if type(category) == "table" and type(category.colors) == "table" then
+				best = lowestPrice(best, category.price)
 				for _, colour in ipairs(category.colors) do
 					if colour.colorindex == button.colorindex then
-						best = lowestPrice(best, category.price)
+						known = true
 						break
 					end
 				end
 			end
 		end
-		return best or 0
+		return known and best or nil
 	end
 	if button.tint ~= nil then
+		if button.tint == false then
+			return 0
+		end
 		for _, entry in ipairs(prices.windowtint or {}) do
 			if entry.tint == button.tint then
 				best = lowestPrice(best, entry.price)
 			end
 		end
-		return best or 0
+		return best
 	end
 	if button.plateindex ~= nil then
 		for _, entry in ipairs(prices.plates or {}) do
@@ -124,15 +126,18 @@ local function minimumPrice(button)
 				best = lowestPrice(best, entry.price)
 			end
 		end
-		return best or 0
+		return best
 	end
 	if button.xenon ~= nil then
+		if button.xenon == -1 then
+			return 0
+		end
 		for _, entry in ipairs(prices.xenoncolor or {}) do
 			if entry.xenon == button.xenon then
 				best = lowestPrice(best, entry.price)
 			end
 		end
-		return best or 0
+		return best
 	end
 	if button.neon ~= nil then
 		for _, entry in ipairs(prices.neoncolor or {}) do
@@ -140,7 +145,7 @@ local function minimumPrice(button)
 				best = lowestPrice(best, entry.price)
 			end
 		end
-		return best or 0
+		return best
 	end
 	if button.smokecolor ~= nil then
 		for _, entry in ipairs(prices.wheelaccessories or {}) do
@@ -148,7 +153,10 @@ local function minimumPrice(button)
 				best = lowestPrice(best, entry.price)
 			end
 		end
-		return best or 0
+		return best
+	end
+	if button.name == "None" then
+		return 0
 	end
 	for _, key in ipairs({"wheelaccessories", "neonlayout"}) do
 		for _, entry in ipairs(prices[key] or {}) do
@@ -157,7 +165,7 @@ local function minimumPrice(button)
 			end
 		end
 	end
-	return best or 0
+	return best
 end
 
 RegisterServerEvent('lockGarage')
@@ -168,10 +176,8 @@ AddEventHandler('lockGarage', function(b,garage)
 		return
 	end
 	if b then
-		if g.locked and g.player ~= source then
-			return
-		end
-		if not nearGarage(source, tonumber(garage)) then
+		if (g.locked and g.player ~= source) or not nearGarage(source, tonumber(garage)) then
+			vRPclient.notify(source, {"~r~This garage is already in use, please try again."})
 			return
 		end
 		for i,other in pairs(tbl) do
@@ -215,7 +221,8 @@ AddEventHandler("LSC:buttonSelected", function(name, button)
 	local user_id = vRP.getUserId(source)
 	if user_id and type(button) == "table" and inGarage(source) then
 		local price = tonumber(button.price or 0)
-		if price == nil or price ~= price or price < minimumPrice(button) then
+		local minimum = minimumPrice(button)
+		if price == nil or price ~= price or minimum == nil or price < minimum then
 			return
 		end
 		TriggerClientEvent("LSC:buttonSelected", source, name, button, vRP.tryFullPayment(user_id, price))

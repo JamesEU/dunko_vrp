@@ -375,7 +375,7 @@ local choice_seize_weapons = {function(player, choice)
         vRPclient.isHandcuffed(nplayer,{}, function(handcuffed)  -- check handcuffed
           if handcuffed then
             vRPclient.getWeapons(nplayer,{},function(weapons)
-              weapons = vRP.reconcileWeapons(nuser_id, weapons)
+              weapons = vRP.reconcileWeapons(nuser_id, weapons, true)
               for k,v in pairs(weapons) do -- display seized weapons
                 -- vRPclient.notify(player,{lang.police.menu.seize.seized({k,v.ammo})})
                 -- convert weapons to parametric weapon items
@@ -521,7 +521,7 @@ local isStoring = {}
 local choice_store_weapons = {function(player, choice)
     local user_id = vRP.getUserId(player)
 	vRPclient.getWeapons(player,{},function(weapons)
-        weapons = vRP.reconcileWeapons(user_id, weapons)
+        weapons = vRP.reconcileWeapons(user_id, weapons, true)
         if not isStoring[player] then
             isStoring[player] = true
             vRPclient.giveWeapons(player,{{},true}, function(removedwep)

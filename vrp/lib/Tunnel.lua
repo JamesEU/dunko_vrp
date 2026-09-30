@@ -28,6 +28,10 @@ local function tunnel_resolve(itable,key)
       args = {}
     end
 
+    if type(callback) == "function" and Tunnel.bindCallback then
+      callback = Tunnel.bindCallback(callback)
+    end
+
     -- get delay data
     local delay_data = Tunnel.delays[dest]
     if delay_data == nil then

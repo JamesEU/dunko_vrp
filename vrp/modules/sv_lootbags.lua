@@ -18,12 +18,21 @@ function tvRP.Coma()
         if user_id == nil or comaCooldown[user_id] then
             return
         end
-        comaCooldown[user_id] = true
-        SetTimeout(30000, function()
-            comaCooldown[user_id] = nil
+        local token = {}
+        comaCooldown[user_id] = token
+        SetTimeout(15000, function()
+            if comaCooldown[user_id] == token then
+                comaCooldown[user_id] = nil
+            end
         end)
         Wait(3000)
+        local waited = 0
+        while vRP.isStoringWeapons(user_id) and waited < 5000 do
+            Wait(100)
+            waited = waited + 100
+        end
         if not vRP.isPlayerDowned(source) then
+            comaCooldown[user_id] = nil
             return
         end
         local model = GetHashKey('prop_cs_heist_bag_01')

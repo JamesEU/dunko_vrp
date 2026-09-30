@@ -184,6 +184,7 @@ MySQL.createCommand("vRP/add_identifier","INSERT INTO vrp_user_ids(identifier,us
 MySQL.createCommand("vRP/userid_byidentifier","SELECT user_id FROM vrp_user_ids WHERE identifier = @identifier")
 MySQL.createCommand("vRP/identifier_all","SELECT * FROM vrp_user_ids WHERE identifier = @identifier")
 MySQL.createCommand("vRP/select_identifier_byid_all","SELECT * FROM vrp_user_ids WHERE user_id = @id")
+MySQL.createCommand("vRP/identifier_banned","SELECT user_id FROM vrp_user_ids WHERE identifier = @identifier AND banned = 1")
 
 MySQL.createCommand("vRP/set_userdata","REPLACE INTO vrp_user_data(user_id,dkey,dvalue) VALUES(@user_id,@key,@value)")
 MySQL.createCommand("vRP/get_userdata","SELECT dvalue FROM vrp_user_data WHERE user_id = @user_id AND dkey = @key")
@@ -473,9 +474,9 @@ end
 
 function vRP.IdentifierBanCheck(source,user_id,cb)
     for i,v in pairs(GetPlayerIdentifiers(source)) do
-        local rows = MySQL.asyncQuery('vRP/identifier_all', {identifier = v}) or {}
+        local rows = MySQL.asyncQuery('vRP/identifier_banned', {identifier = v}) or {}
         for i = 1,#rows do
-            if rows[i].banned then
+            if rows[i].user_id ~= nil then
                 if user_id ~= rows[i].user_id then
                     if cb then
                         cb(true, rows[i].user_id)

@@ -1,16 +1,16 @@
 
+local Tunnel = module("lib/Tunnel")
 local client_areas = {}
-local area_context = {}
+local area_contexts = setmetatable({}, {__mode = "k"})
 local area_enter_tolerance = 3.0
 local area_leave_tolerance = 6.0
 
 -- free client areas when leaving
 AddEventHandler("vRP:playerLeave",function(user_id,source)
   client_areas[source] = nil 
-  area_context[source] = nil
 end)
 
-local function getPlayerCoords(source)
+function vRP.getPlayerCoords(source)
   local ped = GetPlayerPed(source)
   if ped == nil or ped == 0 or not DoesEntityExist(ped) then
     return nil
@@ -19,7 +19,7 @@ local function getPlayerCoords(source)
 end
 
 local function isNearArea(source, area, tolerance)
-  local coords = getPlayerCoords(source)
+  local coords = vRP.getPlayerCoords(source)
   if coords == nil then
     return true
   end
@@ -27,25 +27,46 @@ local function isNearArea(source, area, tolerance)
   return math.sqrt(dx*dx + dy*dy + dz*dz) <= area.radius + tolerance and math.abs(dz) <= area.height + tolerance
 end
 
-local function callInAreaContext(source, name, cb, ...)
-  local previous = area_context[source]
-  area_context[source] = name
+local function runInContext(ctx, cb, ...)
+  local co = coroutine.running()
+  local previous = area_contexts[co]
+  area_contexts[co] = ctx
   local ok, err = pcall(cb, ...)
-  area_context[source] = previous
+  area_contexts[co] = previous
   if not ok then
     error(err, 0)
   end
 end
 
+local function bindContext(cb)
+  local ctx = area_contexts[coroutine.running()]
+  if ctx == nil or type(cb) ~= "function" then
+    return cb
+  end
+  return function(...)
+    return runInContext(ctx, cb, ...)
+  end
+end
+
+Tunnel.bindCallback = bindContext
+
+local rawQuery = MySQL.query
+MySQL.query = function(queryname, variables, cb)
+  return rawQuery(queryname, variables, bindContext(cb))
+end
+
 function vRP.getAreaContext(source)
-  return area_context[source]
+  local ctx = area_contexts[coroutine.running()]
+  if ctx ~= nil and ctx.source == source then
+    return ctx.name
+  end
 end
 
 function vRP.callInAreaContext(source, name, cb, ...)
   if name == nil then
     return cb(...)
   end
-  callInAreaContext(source, name, cb, ...)
+  runInContext({source = source, name = name}, cb, ...)
 end
 
 function vRP.isInArea(source, name)
@@ -59,7 +80,7 @@ function vRP.setArea(source,name,x,y,z,radius,height,cb_enter,cb_leave)
   local areas = client_areas[source] or {}
   client_areas[source] = areas
 
-  areas[name] = {enter=cb_enter,leave=cb_leave,x=tonumber(x) or 0,y=tonumber(y) or 0,z=tonumber(z) or 0,radius=tonumber(radius) or 1,height=tonumber(height) or 6,inside=false}
+  areas[name] = {enter=cb_enter,leave=cb_leave,x=tonumber(x) or 0,y=tonumber(y) or 0,z=tonumber(z) or 0,radius=tonumber(radius) or 1,height=tonumber(height) or 6,inside=false,pending=false}
   vRPclient.setArea(source,{name,x,y,z,radius,height})
 end
 
@@ -75,6 +96,15 @@ function vRP.removeArea(source,name)
   end
 end
 
+local function enterArea(source, name, area)
+  area.pending = false
+  area.inside = true
+  area.outside_ticks = 0
+  if area.enter then
+    vRP.callInAreaContext(source, name, area.enter, source, name)
+  end
+end
+
 -- TUNNER SERVER API
 
 function tvRP.enterArea(name)
@@ -83,16 +113,10 @@ function tvRP.enterArea(name)
   if areas then
     local area = areas[name] 
     if area and not area.inside then
-      if not isNearArea(source, area, area_enter_tolerance) then
-        Wait(1000)
-        if client_areas[source] ~= areas or areas[name] ~= area or area.inside or not isNearArea(source, area, area_enter_tolerance) then
-          return
-        end
-      end
-      area.inside = true
-      area.outside_ticks = 0
-      if area.enter then
-        callInAreaContext(source, name, area.enter, source, name)
+      if isNearArea(source, area, area_enter_tolerance) then
+        enterArea(source, name, area)
+      else
+        area.pending = true
       end
     end
   end
@@ -104,10 +128,13 @@ function tvRP.leaveArea(name)
 
   if areas then
     local area = areas[name] 
-    if area and area.inside then
-      area.inside = false
-      if area.leave then
-        area.leave(source,name)
+    if area then
+      area.pending = false
+      if area.inside then
+        area.inside = false
+        if area.leave then
+          area.leave(source,name)
+        end
       end
     end
   end
@@ -117,6 +144,7 @@ Citizen.CreateThread(function()
   while true do
     Citizen.Wait(1000)
     local left = {}
+    local entered = {}
     for source, areas in pairs(client_areas) do
       for name, area in pairs(areas) do
         if area.inside then
@@ -130,6 +158,8 @@ Citizen.CreateThread(function()
               table.insert(left, {source, name, area})
             end
           end
+        elseif area.pending and isNearArea(source, area, area_enter_tolerance) then
+          table.insert(entered, {source, name, area})
         end
       end
     end
@@ -141,9 +171,17 @@ Citizen.CreateThread(function()
         end
       end
     end
+    for _, v in ipairs(entered) do
+      local areas = client_areas[v[1]]
+      if areas and areas[v[2]] == v[3] and v[3].pending and not v[3].inside then
+        local ok, err = pcall(enterArea, v[1], v[2], v[3])
+        if not ok then
+          print("[vRP] area enter error: "..tostring(err))
+        end
+      end
+    end
   end
 end)
-
 
 local cfg = module("cfg/blips_markers")
 
